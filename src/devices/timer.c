@@ -35,7 +35,10 @@ static void real_time_delay (int64_t num, int32_t denom);
 void
 timer_init (void) 
 {
+  //PIT: 可编程间隔定时器, channel 0, mode 2, frequency TIMER_FREQ(100 次/秒)
+  //给PIT配置配置特定的频率,模式和channel，这样PIT就会以这个配置产生中断
   pit_configure_channel (0, 2, TIMER_FREQ);
+  //时钟中断注册: 对应的是起始中断向量号0x20, 中断处理函数是timer_interrupt, 名字是"8254 Timer"
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
 }
 
@@ -170,8 +173,8 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
-  ticks++;
-  thread_tick ();
+  ticks++;  //记录该os已经运行的tick数 
+  thread_tick ();  //更新当前线程从获得CPU到现在所占用的时间
 }
 
 /** Returns true if LOOPS iterations waits for more than one timer
