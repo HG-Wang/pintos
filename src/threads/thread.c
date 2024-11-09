@@ -596,7 +596,25 @@ allocate_tid (void)
 
   return tid;
 }
-
+
+void thread_sleep(int64_t ticks){
+  if(ticks < 0 ){
+    return;
+  }
+  struct thread *cur = thread_current(); //当前线程
+  enum intr_level old_level = intr_disable(); //关中断
+  //critical section
+  if(cur != idle_thread) //如果是idle线程,不需要sleep
+  {
+    cur->wake_time = ticks + timer_ticks(); //设置唤醒时间
+    cur->status = THREAD_SLEEP; //设置状态为sleep
+    schedule(); //调度
+  }
+  //end of critical section
+  intr_set_level(old_level); //开中断
+}
+
+
 /** Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
