@@ -179,6 +179,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;  //记录该os已经运行的tick数 
   thread_tick ();  //更新当前线程从获得CPU到现在所占用的时间
+  check_and_wakeup_sleeping_threads(); //检查是否有线程需要唤醒
 }
 
 /** Returns true if LOOPS iterations waits for more than one timer
