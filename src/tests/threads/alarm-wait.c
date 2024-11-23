@@ -144,6 +144,7 @@ sleeper (void *t_)
   for (i = 1; i <= test->iterations; i++) 
     {
       int64_t sleep_until = test->start + i * t->duration;
+      thread_set_priority(t->duration); //设置优先级为duration
       timer_sleep (sleep_until - timer_ticks ());
       lock_acquire (&test->output_lock);
       *test->output_pos++ = t->id;
