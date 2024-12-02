@@ -79,6 +79,13 @@ bool prio_cmp_fun(struct list_elem *elem_i,struct list_elem *elem_o,void *aux){
   struct thread *t2 = list_entry(elem_o,struct thread,elem);
   return t1->priority > t2->priority;
 }
+
+//优先级比较(所有线程)
+bool prio_cmp_all(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+  struct thread *t_a = list_entry(a, struct thread, allelem);
+  struct thread *t_b = list_entry(b, struct thread, allelem);
+  return t_a->priority > t_b->priority;
+}
 /** Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -616,18 +623,23 @@ void thread_sleep(int64_t ticks){
 
 //唤醒睡眠的线程
 void check_and_wakeup_sleeping_threads(void){
-  struct list_elem *e = list_begin(&all_list); //list for all threads
-  int64_t cur_ticks = timer_ticks(); //当前时间
+  // 对 all_list 按照优先级从高到低排序
+  list_sort(&all_list, prio_cmp_all, NULL);
+
+  struct list_elem *e = list_begin(&all_list); // 获取 all_list 的起始元素
+
+  int64_t cur_ticks = timer_ticks(); // 当前时间
   while(e != list_end(&all_list)){
-    struct thread *t = list_entry(e,struct thread,allelem); //获取线程
-    enum intr_level old_level = intr_disable(); //关中断
-    if(t->status == THREAD_SLEEP && t->wake_time <= cur_ticks){ //如果是sleep状态且时间到了
-      t->status = THREAD_READY; //设置为ready状态
-      list_insert_ordered(&ready_list,&t->elem,prio_cmp_fun,NULL); //插入到ready_list
-      printf("Wake up thread %s at tick %ld\n",t->name,cur_ticks); //打印唤醒信息
+    struct thread *t = list_entry(e, struct thread, allelem); // 获取线程
+    struct list_elem *next = list_next(e); // 提前保存下一个元素
+    enum intr_level old_level = intr_disable(); // 关中断
+    if(t->status == THREAD_SLEEP && t->wake_time <= cur_ticks){ // 如果是睡眠状态且时间到了
+      t->status = THREAD_READY; // 设置为就绪状态
+      list_insert_ordered(&ready_list, &t->elem, prio_cmp_fun, NULL); // 插入到 ready_list
+      printf("Wake up thread %s at tick %ld\n", t->name, cur_ticks); // 打印唤醒信息
     }
-    e = list_next(e); //下一个线程
-    intr_set_level(old_level); //开中断
+    intr_set_level(old_level); // 开中断
+    e = next; // 继续遍历下一个元素
   }
 }
 
