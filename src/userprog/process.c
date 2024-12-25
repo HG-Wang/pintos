@@ -77,7 +77,6 @@ start_process (void *file_name_)
   char *save_ptr;
   file_name = strtok_r(file_name, " ", &save_ptr);
   success = load(file_name, &if_.eip, &if_.esp);
-
   
   char *token;
   if(success){ //如果load成功
