@@ -28,38 +28,32 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
-  char *fn_copy,*fn_copy2;
+  char *fn_copy;
   tid_t tid;
 
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
-  fn_copy2 = palloc_get_page (0);
-  if (fn_copy == NULL || fn_copy2 == NULL) {
-    if (fn_copy != NULL) {
-      palloc_free_page(fn_copy);
-    }
-    if (fn_copy2 != NULL) {
-      palloc_free_page(fn_copy2);
-    }
+  strlcpy (fn_copy, file_name, PGSIZE);
+
+  char* fn_real = palloc_get_page(0);
+  if(fn_real == NULL){
     return TID_ERROR;
   }
-  strlcpy (fn_copy, file_name, PGSIZE);
-  strlcpy (fn_copy2, file_name, PGSIZE);
-
-  // 调用strtok_r()函数，将file_name拆分为两部分，第一部分为命令，第二部分为参数,用文件名作为线程名
+  strlcpy(fn_real, file_name, PGSIZE);
   char *save_ptr;
-  char *thread_name = strtok_r(fn_copy2, " ", &save_ptr);
-  //对start_process进行传递时传递的仍然是原本的参数
-  tid = thread_create (thread_name, PRI_DEFAULT, start_process, fn_copy);
+  fn_real = strtok_r(fn_real, " ", &save_ptr);
 
-  palloc_free_page (fn_copy2); 
+  tid = thread_create (fn_real, PRI_DEFAULT, start_process, fn_copy);
+  palloc_free_page (fn_real); 
 
   /* Create a new thread to execute FILE_NAME. */
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
 }
+
+
 
 /** A thread function that loads a user process and starts it
    running. */
@@ -77,6 +71,32 @@ start_process (void *file_name_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
 
+  //参数分离， 获得文件名
+  char *token , *save_ptr;
+  file_name = strtok_r(file_name, " ", &save_ptr);
+  success = load(file_name, &if_.eip, &if_.esp);
+  
+  if(success){ //如果load成功
+    // 计算参数个数
+    int argc = 0;
+    int argv[50]; //测试用例最多50个参数
+    for(token = strtok_r(NULL, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
+      //检查是否超出栈的范围
+      if(if_.esp - strlen(token) - 1 < PHYS_BASE){
+        success = false;
+        break;
+      }
+      if_.esp -= strlen(token) + 1;
+      memcpy(if_.esp, token, strlen(token) + 1);
+      argv[argc++] = (int) if_.esp;
+    }
+    //将参数的地址压入栈中
+    push_argument(&if_.esp, argc, argv);
+    thread_current()->parent->success = true;
+    sema_up(&thread_current()->parent->sema);
+
+  }
+
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
@@ -91,6 +111,23 @@ start_process (void *file_name_)
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
   NOT_REACHED ();
 }
+
+  void push_argument(void **esp, int argc, int argv[]){
+    *esp = (int) *esp & 0xfffffffc;
+    *esp -= 4;
+    *(int *)*esp = 0;
+    //将参数的地址压入栈中
+    for(int i = argc - 1; i >= 0; i--){
+      *esp -= 4;
+      *(int *)*esp = argv[i];
+    }
+    *esp -= 4;
+    *(int *)*esp = (int) *esp + 4;
+    *esp -= 4;
+    *(int *)*esp = argc;
+    *esp -= 4;
+    *(int *)*esp = 0;
+  }
 
 /** Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
