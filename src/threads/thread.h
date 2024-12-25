@@ -100,6 +100,7 @@ struct thread
     uint32_t *pagedir;                  /**< Page directory. */
     struct semaphore sema;             /**< synchronize with child thread */
     struct thread* parent;            /**<point to parent thread */
+    uint32_t st_exit;                      /**<exit status of the thread */
 #endif
 
     /* Owned by thread.c. */

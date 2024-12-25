@@ -33,3 +33,10 @@ syscall_handler (struct intr_frame *f UNUSED)
   }
   
 }
+
+void sys_exit(struct intr_frame *f){
+  uint32_t *user_ptr = f->esp;
+  *user_ptr++;
+  thread_current()->st_exit = *user_ptr;
+  thread_exit();
+}
