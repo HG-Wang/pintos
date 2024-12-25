@@ -69,31 +69,42 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
 
   //参数分离， 获得文件名
-  char *token , *save_ptr;
+  char *fn_copy = palloc_get_page(0);
+  strlcpy(fn_copy, file_name, strlen(file_name) + 1);
+  char *save_ptr;
   file_name = strtok_r(file_name, " ", &save_ptr);
   success = load(file_name, &if_.eip, &if_.esp);
   
+  
+  char *token;
   if(success){ //如果load成功
     // 计算参数个数
     int argc = 0;
-    int argv[50]; //测试用例最多50个参数
-    for(token = strtok_r(NULL, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
-      //检查是否超出栈的范围
-      if(if_.esp - strlen(token) - 1 < PHYS_BASE){
-        success = false;
-        break;
-      }
+    int argv[32]; //测试用例最多32个参数
+    //将参数压入栈中
+    for(token = strtok_r(fn_copy, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr)){
       if_.esp -= strlen(token) + 1;
       memcpy(if_.esp, token, strlen(token) + 1);
-      argv[argc++] = (int) if_.esp;
+      argv[argc++] = (int)if_.esp;
     }
-    //将参数的地址压入栈中
-    push_argument(&if_.esp, argc, argv);
-    thread_current()->parent->success = true;
-    sema_up(&thread_current()->parent->sema);
+    
+    //把参数地址压入栈中
+    void** esp = &if_.esp;
+    *esp = (int)*esp & 0xfffffffc; //4字节对齐
+    *esp -= 4;
+    *(int*)*esp = 0; 
+    for(int i = argc - 1; i >= 0; i--){
+      *esp -= 4;
+      *(int*)*esp = argv[i];
+    }
+    *esp -= 4;
+    *(int*)*esp = (int)(*esp + 4);
+    *esp -= 4;
+    *(int*)*esp = argc;
+    *esp -= 4;
+    *(int*)*esp = 0;
 
   }
 
@@ -112,22 +123,6 @@ start_process (void *file_name_)
   NOT_REACHED ();
 }
 
-  void push_argument(void **esp, int argc, int argv[]){
-    *esp = (int) *esp & 0xfffffffc;
-    *esp -= 4;
-    *(int *)*esp = 0;
-    //将参数的地址压入栈中
-    for(int i = argc - 1; i >= 0; i--){
-      *esp -= 4;
-      *(int *)*esp = argv[i];
-    }
-    *esp -= 4;
-    *(int *)*esp = (int) *esp + 4;
-    *esp -= 4;
-    *(int *)*esp = argc;
-    *esp -= 4;
-    *(int *)*esp = 0;
-  }
 
 /** Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
