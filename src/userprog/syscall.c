@@ -13,8 +13,8 @@ void
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
-  syscalls[SYS_EXIT] = sys_exit;
-  syscalls[SYS_WRITE] = sys_write;
+  syscalls[SYS_EXIT] = &sys_exit;
+  syscalls[SYS_WRITE] = &sys_write;
 }
 
 static void
@@ -44,9 +44,9 @@ void sys_exit(struct intr_frame *f){
 void sys_write(struct intr_frame *f){
   uint32_t *user_ptr = f->esp;
   *user_ptr++;
-  printf("user_ptr: %x, fesp: %x\n", user_ptr, f->esp);
+  printf("user_ptr:%x, fesp:%x\n", user_ptr, f->esp);
   int tmp = *user_ptr;
-  const char *buffer (const char *)*(user_ptr+1);
+  const char *buffer = (const char *)*(user_ptr+1);
   unsigned size = *(user_ptr+2);
   if(tmp == 1){
     putbuf(buffer, size);
