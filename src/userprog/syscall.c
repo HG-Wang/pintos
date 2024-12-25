@@ -40,3 +40,16 @@ void sys_exit(struct intr_frame *f){
   thread_current()->st_exit = *user_ptr;
   thread_exit();
 }
+
+void sys_write(struct intr_frame *f){
+  uint32_t *user_ptr = f->esp;
+  *user_ptr++;
+  printf("user_ptr: %x, fesp: %x\n", user_ptr, f->esp);
+  int tmp = *user_ptr;
+  const char *buffer (const char *)*(user_ptr+1);
+  unsigned size = *(user_ptr+2);
+  if(tmp == 1){
+    putbuf(buffer, size);
+    f->eax = size;
+  }
+}
