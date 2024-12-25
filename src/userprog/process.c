@@ -57,7 +57,7 @@ tid_t process_execute(const char *file_name)
     return tid;
   }
 
-  sema_down(&thread_current()->sema);
+  //sema_down(&thread_current()->sema);
   
 }
 
@@ -70,31 +70,31 @@ start_process(void *file_name_)
   struct intr_frame if_;
   bool success;
 
+  // 参数分离， 获得文件名
+  char *fn_copy = palloc_get_page(0);
+  strlcpy(fn_copy, file_name, strlen(file_name) + 1);
+
   /* Initialize interrupt frame and load executable. */
   memset(&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load(file_name, &if_.eip, &if_.esp);
 
-
-  // 参数分离， 获得文件名
-  char *fn_copy = palloc_get_page(0);
-  strlcpy(fn_copy, file_name, strlen(file_name) + 1);
-  char *save_ptr;
+  
+  char *save_ptr,*token;
   file_name = strtok_r(file_name, " ", &save_ptr);
   success = load(file_name, &if_.eip, &if_.esp);
+
   if (!success)
-    thread_exit();
-  char *token;
+       thread_exit();
   // 如果load成功
   //  计算参数个数
   int argc = 0;
-  int argv[32]; // 测试用例最多32个参数
+  int argv[50];
   // 将参数压入栈中
   for (token = strtok_r(fn_copy, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
   {
-    if_.esp -= strlen(token) + 1;
+    if_.esp -= (strlen(token) + 1);
     memcpy(if_.esp, token, strlen(token) + 1);
     argv[argc++] = (int)if_.esp;
   }
@@ -129,7 +129,7 @@ start_process(void *file_name_)
   NOT_REACHED();
 
   // 将父进程的信号量sema_up
-  // sema_up(&thread_current()->parent->sema);
+  //sema_up(&thread_current()->parent->sema);
 }
 
 /** Waits for thread TID to die and returns its exit status.  If
