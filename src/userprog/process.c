@@ -25,40 +25,32 @@ static bool load(const char *cmdline, void (**eip)(void), void **esp);
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
-tid_t process_execute(const char *file_name)
+tid_t process_execute (const char *file_name)
 {
-  char *fn_copy;
-  tid_t tid;
+    tid_t tid;
 
-  /* Make a copy of FILE_NAME.
-     Otherwise there's a race between the caller and load(). */
-  fn_copy = palloc_get_page(0);
-  if (fn_copy == NULL)
-  {
-    return TID_ERROR;
-  }
-  strlcpy(fn_copy, file_name, PGSIZE);
+    /* Make a copy of FILE_NAME.
+       Otherwise there's a race between the caller and load(). */
+    char *fn_copy = malloc(strlen(file_name)+1);
+    char *fn_copy2 = malloc(strlen(file_name)+1);
+    strlcpy (fn_copy, file_name, strlen(file_name)+1);
+    strlcpy (fn_copy2, file_name, strlen(file_name)+1);
 
-  char *fn_real = palloc_get_page(0);
-  if (fn_real == NULL)
-  {
-    return TID_ERROR;
-  }
+    /* Create a new thread to execute FILE_NAME. */
+    char * save_ptr;
+    fn_copy2 = strtok_r (fn_copy2, " ", &save_ptr);
+    tid = thread_create (fn_copy2, PRI_DEFAULT, start_process, fn_copy);
+    free (fn_copy2);
 
-  strlcpy(fn_real, file_name, PGSIZE);
-  char *save_ptr;
-  fn_real = strtok_r(fn_real, " ", &save_ptr);
+    if (tid == TID_ERROR){
+        free (fn_copy);
+        return tid;
+    }
 
-  tid = thread_create(fn_real, PRI_DEFAULT, start_process, fn_copy);
-  palloc_free_page(fn_real);
+    /* Sema down the parent process, waiting for child */
+    sema_down(&thread_current()->sema);
 
-  if (tid == TID_ERROR){
-    palloc_free_page(fn_copy);
     return tid;
-  }
-
-  //sema_down(&thread_current()->sema);
-  
 }
 
 /** A thread function that loads a user process and starts it
@@ -83,6 +75,7 @@ start_process(void *file_name_)
   
   char *save_ptr,*token;
   file_name = strtok_r(file_name, " ", &save_ptr);
+  printf("file_name2222: %s\n", file_name);
   success = load(file_name, &if_.eip, &if_.esp);
 
   if (!success)
@@ -129,7 +122,7 @@ start_process(void *file_name_)
   NOT_REACHED();
 
   // 将父进程的信号量sema_up
-  //sema_up(&thread_current()->parent->sema);
+  sema_up(&thread_current()->parent->sema);
 }
 
 /** Waits for thread TID to die and returns its exit status.  If
