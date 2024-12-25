@@ -43,14 +43,15 @@ process_execute (const char *file_name)
   strlcpy(fn_real, file_name, PGSIZE);
   char *save_ptr;
   fn_real = strtok_r(fn_real, " ", &save_ptr);
+  
 
   tid = thread_create (fn_real, PRI_DEFAULT, start_process, fn_copy);
   palloc_free_page (fn_real); 
 
-  /* Create a new thread to execute FILE_NAME. */
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
   return tid;
+  sema_down(&thread_current()->sema);
 }
 
 
@@ -76,7 +77,7 @@ start_process (void *file_name_)
   char *save_ptr;
   file_name = strtok_r(file_name, " ", &save_ptr);
   success = load(file_name, &if_.eip, &if_.esp);
-  
+
   
   char *token;
   if(success){ //如果load成功
@@ -106,6 +107,8 @@ start_process (void *file_name_)
     *esp -= 4;
     *(int*)*esp = 0;
 
+    //将父进程的信号量sema_up
+    sema_up(&thread_current()->parent->sema);
   }
 
   /* If load failed, quit. */
